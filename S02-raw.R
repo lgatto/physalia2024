@@ -1,7 +1,7 @@
 ## Raw MS data
 
 ## binary - vendor-specific formats
-## open formats: mzML
+## open formats: mzML, mzXML
 
 ## proteowizard msconvert: https://proteowizard.sourceforge.io/
 ##
@@ -107,9 +107,107 @@ MsCoreUtils::formatRt(rtime(sp)[2800:2820])
 
 sp[2807]
 
+library(tidyverse)
+
+spectraData(sp) |>
+    as.data.frame() |>
+    as_tibble() |>
+    filter(msLevel == 1) |>
+    ggplot(aes(x = rtime,
+               y = totIonCurrent)) +
+    geom_line()
+
+
 ## The filterPrecursorScan() function can be used to retain a set
 ## parent (MS1) and children scans (MS2), as defined by an acquisition
 ## number. Use it to extract the MS1 scan of interest and all its MS2
 ## children.
 
-## ?Spectra
+sp2 <- filterPrecursorScan(sp, 2807)
+
+## Plot the MS1 spectrum of interest and highlight all the peaks that
+## will be selected for MS2 analysis.
+
+plotSpectra(sp2[1], xlim = c(400, 1000))
+
+abline(v = precursorMz(sp2)[-1], col = "grey")
+
+## Use plotSpectra() function to plot all 10 MS2 spectra in one call.
+
+plotSpectra(sp2[-1])
+
+plotSpectra(sp2[2:11])
+
+plotSpectra(filterMsLevel(sp2, 2L))
+
+
+## Focus of mz range
+
+plotSpectra(sp[2807], xlim = c(521.2, 522.5))
+
+plotSpectra(sp[2807], xlim = c(521.25, 521.4))
+
+par(mfrow = c(2, 1))
+
+## Processing
+
+plotSpectra(sp[2807], xlim = c(521.2, 522.5))
+Spectra::pickPeaks(sp[2807]) |>
+    filterIntensity(1e7) |>
+    plotSpectra(xlim = c(521.25, 522.5))
+
+table(msLevel(sp), centroided(sp))
+
+
+## More visualisation
+
+plotSpectra(sp2[7],
+            xlim = c(126, 132))
+
+mzLabel <- function(z) {
+    ## z is an instance of class Spectra
+    z <- peaksData(z)[[1L]]
+    lab <- format(z[, "mz"], digits = 4)
+    lab[z[, "intensity"] < 1e5] <- ""
+    lab
+}
+
+plotSpectra(sp2[7],
+            labels = mzLabel,
+            xlim = c(126, 132))
+
+
+sp2 <- filterMsLevel(sp, 2L)
+
+anyDuplicated(precursorMz(sp2))
+
+i <- which(precursorMz(sp2) == precursorMz(sp2)[37])
+
+plotSpectra(sp2[i])
+
+
+plotSpectraMirror(sp2[31], sp2[37])
+
+plotSpectraOverlay(sp2[i], col = c("red", "steelblue"))
+
+## BiocManager::install("RforMassSpectrometry/SpectraVis")
+
+library(SpectraVis)
+
+plotlySpectra(sp2[31])
+
+browseSpectra(sp)
+
+
+BiocManager::install("MsBackendMgf")
+
+
+(fls <- dir(system.file("sciex", package = "msdata"), full.names = TRUE))
+
+basename(fls)
+
+sciex <- Spectra(fls)
+
+dataOrigin(sciex)
+
+table(dataOrigin(sciex))
