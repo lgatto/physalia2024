@@ -9,6 +9,12 @@
   handle and analyse such with R (also applicable to
   metabolomics). Familiarity with R expected.
 
+## Installation
+
+```
+source("https://raw.githubusercontent.com/rformassspectrometry/book/main/install_docs_deps.R")
+```
+
 ## Links
 
 - Teaching material:https://rformassspectrometry.github.io/book/
