@@ -250,3 +250,114 @@ spk <- spid[k]
 plotSpectra(spk)
 
 spk$sequence
+
+## - Calculate the 5 by 5 similarity matrix between all spectra using
+##   compareSpectra(). See the ?Spectra man page for details. Draw a
+##   heatmap of that matrix, for example pheatmap::pheatmap()
+
+mat <- compareSpectra(spk)
+colnames(mat) <- rownames(mat) <- strtrim(spk$sequence, 2)
+mat
+
+library(pheatmap)
+pheatmap(mat)
+
+
+plotSpectraMirror(spk[1], spk[2])
+
+plotSpectraOverlay(spk[3:5],
+                   col = c("red", "steelblue", "green"))
+
+plotSpectraMirror(spk[3], spk[4])
+
+## Recap exercise
+
+## Download the 3 first mzML and mzID files from the PXD022816
+## project (Morgenstern, Barzilay, and Levin 2021).
+
+library(rpx)
+
+px <- PXDataset("PXD022816")
+pxfiles(px)
+pxtax(px)
+pxref(px)
+
+fmzml <- pxget(px, grep("mzML", pxfiles(px), value = TRUE)[1:3])
+basename(fmzml)
+
+fid <- pxget(px, grep("mzID", pxfiles(px), value = TRUE)[1:3])
+basename(fid)
+
+## Generate a Spectra object and a table of filtered PSMs. Visualise
+## the total ion chromatograms and check the quality of the
+## identification data by comparing the density of the decoy and
+## target PSMs id scores for each file.
+
+sp <- Spectra(fmzml)
+
+
+sp
+
+sp$file <- basename(dataOrigin(sp))
+
+table(basename(dataOrigin(sp)), msLevel(sp))
+
+filterMsLevel(sp, 1) |>
+    spectraData() |>
+    as_tibble() |>
+    ggplot(aes(x = rtime,
+               y = totIonCurrent,
+               colour = file)) +
+    geom_line() +
+    facet_wrap(~ file)
+
+
+id <- PSM(fid)
+id$file <- sub("^.+QEP2", "QEP2", id$spectrumFile)
+
+data.frame(id) |>
+    as_tibble() |>
+    count(file)
+
+
+data.frame(id) |>
+    as_tibble() |>
+    ggplot(aes(x = MetaMorpheus.score,
+               colour = isDecoy)) +
+    geom_density() +
+    facet_wrap(~ file)
+
+
+summary(id$PSM.level.q.value)
+
+data.frame(id) |>
+    as_tibble() |>
+    count(file, isDecoy)
+
+idf <- filterPSMs(id)
+
+
+## Join the raw and identification data. Beware though that the
+## joining must now be performed by spectrum ids and by files.
+
+## primary keys
+
+sp$pkey <- paste0(sub("^.+QEP", "QEP", sp$file),
+                  sub("^.+scan=", "::", sp$spectrumId))
+
+
+idf$pkey <- paste0(idf$file,
+                   sub("^.+scan=", "::", idf$spectrumID))
+
+idf[which(idf$pkey == idf$pkey[7]), ] |>
+    data.frame() |>
+    DT::datatable()
+
+table(table(idf$pkey))
+
+sp <- joinSpectraData(sp, idf, by.x = "pkey")
+
+table(filterMsLevel(sp, 2)$file,
+      !is.na(filterMsLevel(sp, 2)$sequence))
+
+length(unique(sp$sequence))
