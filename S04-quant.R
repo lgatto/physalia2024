@@ -153,3 +153,171 @@ keep_vars <- c("Sequence", "Proteins", "Leading.razor.protein",
 rowData(cptac_se) <- rowData(cptac_se)[, keep_vars]
 
 ## Pipeline
+
+
+assay(cptac_se)
+
+anyNA(assay(cptac_se))
+
+cptac_se <- zeroIsNA(cptac_se)
+
+assay(cptac_se)
+
+nNA(cptac_se)
+
+dim(cptac_se)
+
+barplot(nNA(cptac_se)$nNAcols$nNA)
+
+
+table(nNA(cptac_se)$nNArows$nNA)
+
+cptac_se <- filterNA(cptac_se, pNA = 4/6)
+
+table(nNA(cptac_se)$nNArows$nNA)
+
+nNA(cptac_se)
+
+
+
+se1 <- impute(cptac_se, method = "knn")
+assay(se1)
+
+## Imputation with method "MinDet"
+se2 <- impute(cptac_se, method = "MinDet")
+
+## Imputation with method "zero"
+se3 <- impute(cptac_se, method = "zero")
+
+par(mfrow = c(2, 2))
+
+plot(density(na.omit(log2(assay(cptac_se)))))
+plot(density(na.omit(log2(assay(se1)))))
+plot(density(na.omit(log2(assay(se2)))), title = "MinDet")
+plot(density(na.omit(log2(assay(se3)+1))), title = "zero")
+
+rowData(cptac_se) %>%
+    as_tibble() %>%
+    ggplot(aes(x = Score, colour = Reverse)) +
+    geom_density()
+
+
+rowData(cptac_se) %>%
+    as_tibble() %>%
+    ggplot(aes(x = PEP, colour = Reverse)) +
+    geom_density()
+
+
+## connected components -> also with an SE
+
+
+cptac <- QFeatures(list(peptides = cptac_se))
+colData(cptac) <- colData(cptac[[1]])
+
+## Using the filterFeatures() function, filter out the reverse and
+## contaminant hits, and also retain those that have a posterior error
+## probability smaller than 0.05.
+
+
+table(rowData(cptac_se)$Reverse)
+table(rowData(cptac_se)$Potential.contaminant)
+
+ctpac <- cptac |>
+    filterFeatures(~ Reverse != "+") |>
+    filterFeatures(~ Potential.contaminant != "+") |>
+    filterFeatures(~ PEP < 0.05)
+
+cptac <- cptac |>
+    logTransform(i = "peptides",
+                 name = "log_peptides") |>
+    normalize(i = "log_peptides",
+              name = "lognorm_peptides",
+              method = "center.median")
+
+## Aggregation: log-normalised peptides into proteins, defined the
+## Leading.razor.protein variable.
+
+cptac <-
+    aggregateFeatures(cptac,
+                      i = "lognorm_peptides",
+                      name = "proteins",
+                      fcol = "Leading.razor.protein",
+                      fun = colMedians,
+                      na.rm = TRUE)
+
+
+
+table(rowData(cptac[[4]])$.n)
+
+limma::plotDensities(assay(cptac[["peptides"]]))
+limma::plotDensities(assay(cptac[["log_peptides"]]))
+limma::plotDensities(assay(cptac[["lognorm_peptides"]]))
+
+
+library(factoextra)
+
+cptac[[3]] |>
+    filterNA() |>
+    assay() |>
+    t() |>
+    prcomp(scale = TRUE, center = TRUE) |>
+    fviz_pca_ind(habillage = cptac$condition)
+
+cptac[[3]] |>
+    filterNA() |>
+    assay() |>
+    t() |>
+    prcomp(scale = TRUE, center = TRUE) |>
+    fviz_screeplot()
+
+cptac[[4]] |>
+    filterNA() |>
+    assay() |>
+    t() |>
+    prcomp(scale = TRUE, center = TRUE) |>
+    fviz_pca_ind(habillage = cptac$condition)
+
+cptac[[4]] |>
+    filterNA() |>
+    assay() |>
+    t() |>
+    prcomp(scale = TRUE, center = TRUE) |>
+    fviz_pca_ind(habillage = cptac$condition,
+                 axes = c(1, 3))
+
+
+cptac[[4]] |>
+    filterNA() |>
+    assay() |>
+    t() |>
+    prcomp(scale = TRUE, center = TRUE) |>
+    fviz_pca(habillage = cptac$condition)
+
+
+cptac["P02787ups|TRFE_HUMAN_UPS", ,
+      c("lognorm_peptides", "proteins")] |>
+    longFormat() |>
+    as_tibble() |>
+    ggplot(aes(x = colname,
+               y = value,
+               colour = rowname)) +
+    geom_point() +
+    geom_line(aes(group = rowname)) +
+    facet_wrap(~ assay)
+
+plot(cptac)
+
+
+normalize(cptac, "log_peptides",
+          name = "logquantiles_peptides",
+          method = "quantiles") |>
+    aggregateFeatures(
+        "logquantiles_peptides",
+        name = "proteins2",
+        fcol = "Leading.razor.protein",
+        fun = colMedians,
+        na.rm = TRUE) |>
+    plot()
+
+
+se <- getWithColData(cptac, "proteins")
