@@ -211,3 +211,18 @@ sciex <- Spectra(fls)
 dataOrigin(sciex)
 
 table(dataOrigin(sciex))
+
+
+
+####################################################3
+library(mzR)
+
+Spectra(f)
+
+x <- openMSfile(f)
+
+hd <- header(x) ## like spectraData from Spectra
+
+pk <- mzR::peaks(x) ## like peaksData from Spectra
+
+Spectra(DataFrame(hd))
